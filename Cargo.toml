@@ -1,0 +1,9 @@
+[package]
+name = "cloud-persistent-storage"
+version = "0.1.0"
+authors = ["Mathieu Fenniak <mathieu@fenniak.net>"]
+
+[dependencies]
+rusoto = {version = "0.23", features = ["ec2"]}
+log = "*"
+env_logger = "*"
