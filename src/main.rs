@@ -17,7 +17,7 @@ fn main() {
         Err(e) => {
             error!("Unable to retrieve instance metadata.  Am I running on EC2?  {:?}",
                    e);
-            std::process::exit(102);
+            std::process::exit(100);
         }
     };
     let credentials = DefaultCredentialsProvider::new().unwrap();
@@ -31,17 +31,26 @@ fn main() {
             // FIXME: create/ensure filesystem
             // FIXME: mount volume
         }
-        Err(e) => error!("attach volume failed: {:?}", e),
+        Err(e) => {
+            error!("attach volume failed: {:?}", e);
+            std::process::exit(101);
+        }
     }
 }
 
 #[derive(Debug)]
 pub enum AttachVolumeError {
     NoVolumesAvailable,
-    AllVolumesFailed,
+    AllAttachesFailed,
     DescribeVolumesFailed(rusoto::ec2::DescribeVolumesError),
+    DescribeVolumesPaginationSupportRequired,
 }
 
+impl From<rusoto::ec2::DescribeVolumesError> for AttachVolumeError {
+    fn from(err: rusoto::ec2::DescribeVolumesError) -> AttachVolumeError {
+        AttachVolumeError::DescribeVolumesFailed(err)
+    }
+}
 
 fn attach_volume<P, D>(ec2_client: &Ec2Client<P, D>,
                        metadata: &aws_instance_metadata::metadata::InstanceMetadata)
@@ -64,32 +73,33 @@ fn attach_volume<P, D>(ec2_client: &Ec2Client<P, D>,
     };
 
     trace!("executing DescribeVolumes");
-    match ec2_client.describe_volumes(&request) {
-        Ok(response) => {
-            if response.next_token.is_some() {
-                error!("DescribeVolumes returned multiple pages of results; this is not currently supported");
-                std::process::exit(100);
-            }
-            match response.volumes {
-                None => Err(AttachVolumeError::NoVolumesAvailable),
-                Some(volumes) => {
-                    for vol in &volumes {
-                        debug!("attempting to attach target volume: {:?}", vol);
-                        let attach_volume_result =
-                            attach_specific_volume(&metadata.instance_id,
-                                                   vol.volume_id.as_ref().unwrap(),
-                                                   &ec2_client);
-                        if attach_volume_result.is_ok() {
-                            info!("successfully attached volume");
-                            return Ok(());
-                        }
-                    }
+    let response = try!(ec2_client.describe_volumes(&request));
 
-                    Err(AttachVolumeError::AllVolumesFailed)
-                }
+    if response.next_token.is_some() {
+        error!("DescribeVolumes returned multiple pages of results; this is not currently supported");
+        return Err(AttachVolumeError::DescribeVolumesPaginationSupportRequired);
+    }
+
+    if let Some(volumes) = response.volumes {
+        if volumes.is_empty() {
+            return Err(AttachVolumeError::NoVolumesAvailable);
+        }
+
+        for vol in &volumes {
+            debug!("attempting to attach target volume: {:?}", vol);
+            let attach_volume_result = attach_specific_volume(&metadata.instance_id,
+                                                              vol.volume_id.as_ref().unwrap(),
+                                                              &ec2_client);
+            if attach_volume_result.is_ok() {
+                info!("successfully attached volume");
+                return Ok(());
             }
         }
-        Err(err) => Err(AttachVolumeError::DescribeVolumesFailed(err)),
+
+        info!("all queried volumes have been attempted");
+        Err(AttachVolumeError::AllAttachesFailed)
+    } else {
+        Err(AttachVolumeError::NoVolumesAvailable)
     }
 }
 
@@ -106,15 +116,6 @@ fn attach_specific_volume<P, D>(instance_id: &String,
         instance_id: instance_id.clone(),
         volume_id: volume_id.clone(),
     };
-    match ec2_client.attach_volume(&request) {
-        Ok(_) => {
-            info!("volume attached at /dev/xvdh");
-            Ok(())
-        }
-        Err(e) => {
-            // FIXME: not an exit error; just return
-            error!("AttachVolume error: {}", e);
-            Err(e)
-        }
-    }
+    try!(ec2_client.attach_volume(&request));
+    Ok(())
 }
