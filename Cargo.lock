@@ -3,7 +3,9 @@ name = "cloud-persistent-storage"
 version = "0.1.0"
 dependencies = [
  "aws_instance_metadata 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "chrono 0.2.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hyper 0.10.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "rusoto 0.23.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]

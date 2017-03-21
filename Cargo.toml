@@ -8,3 +8,7 @@ rusoto = {version = "0.23", features = ["ec2"]}
 log = "*"
 env_logger = "*"
 aws_instance_metadata = "0.1"
+chrono = "0.2"
+
+[dev-dependencies]
+hyper = "0.10"

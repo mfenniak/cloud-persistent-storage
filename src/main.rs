@@ -4,6 +4,7 @@ extern crate log;
 extern crate env_logger;
 extern crate rusoto;
 extern crate aws_instance_metadata;
+extern crate chrono;
 
 use rusoto::{DefaultCredentialsProvider, ProvideAwsCredentials, DispatchSignedRequest};
 use rusoto::ec2::{Ec2Client, DescribeVolumesRequest, Filter, AttachVolumeRequest};
@@ -111,11 +112,91 @@ fn attach_specific_volume<P, D>(instance_id: &String,
           D: DispatchSignedRequest
 {
     let request = AttachVolumeRequest {
-        device: String::from("/dev/xvdh"),
-        dry_run: None,
+        device: String::from("/dev/xvdh"), // FIXME
+        dry_run: None, //
         instance_id: instance_id.clone(),
         volume_id: volume_id.clone(),
     };
     try!(ec2_client.attach_volume(&request));
     Ok(())
+}
+
+
+#[cfg(test)]
+mod tests {
+    extern crate hyper;
+
+    use super::*;
+    use chrono::{Duration, UTC};
+    use std::collections::HashMap;
+
+    struct MockProvideAwsCredentials {}
+
+    impl rusoto::ProvideAwsCredentials for MockProvideAwsCredentials {
+        fn credentials(&self) -> Result<rusoto::AwsCredentials, rusoto::CredentialsError> {
+            Ok(rusoto::AwsCredentials::new("key",
+                                           "secret",
+                                           None,
+                                           UTC::now() + Duration::seconds(600)))
+        }
+    }
+
+    struct Ec2RequestDispatcherAttachSpecificVolumeSuccess {}
+
+    impl rusoto::DispatchSignedRequest for Ec2RequestDispatcherAttachSpecificVolumeSuccess {
+        fn dispatch(&self,
+                    request: &rusoto::SignedRequest)
+                    -> Result<rusoto::HttpResponse, rusoto::HttpDispatchError> {
+            assert!(request.params.get("Device") == Some(&Some(String::from("/dev/xvdh"))));
+            assert!(request.params.get("InstanceId") == Some(&Some(String::from("i-1234"))));
+            assert!(request.params.get("VolumeId") == Some(&Some(String::from("vol-4321"))));
+            assert!(request.params.get("Action") == Some(&Some(String::from("AttachVolume"))));
+            Ok(rusoto::HttpResponse {
+                   status: hyper::status::StatusCode::Ok,
+                   body: String::from(""),
+                   raw_body: vec![],
+                   headers: HashMap::new(),
+               })
+        }
+    }
+
+    struct Ec2RequestDispatcherAttachSpecificVolumeFailure {}
+
+    impl rusoto::DispatchSignedRequest for Ec2RequestDispatcherAttachSpecificVolumeFailure {
+        fn dispatch(&self,
+                    _: &rusoto::SignedRequest)
+                    -> Result<rusoto::HttpResponse, rusoto::HttpDispatchError> {
+            Ok(rusoto::HttpResponse {
+                   status: hyper::status::StatusCode::BadRequest,
+                   body: String::from(""),
+                   raw_body: vec![],
+                   headers: HashMap::new(),
+               })
+        }
+    }
+
+
+    #[test]
+    fn test_attach_specific_volume_success() {
+        let mock_request_dispatcher = Ec2RequestDispatcherAttachSpecificVolumeSuccess {};
+        let mock_ec2_client = rusoto::ec2::Ec2Client::new(mock_request_dispatcher,
+                                                          MockProvideAwsCredentials {},
+                                                          rusoto::Region::UsWest2);
+        let result = attach_specific_volume(&String::from("i-1234"),
+                                            &String::from("vol-4321"),
+                                            &mock_ec2_client);
+        result.expect("success test case");
+    }
+
+    #[test]
+    fn test_attach_specific_volume_failure() {
+        let mock_request_dispatcher = Ec2RequestDispatcherAttachSpecificVolumeFailure {};
+        let mock_ec2_client = rusoto::ec2::Ec2Client::new(mock_request_dispatcher,
+                                                          MockProvideAwsCredentials {},
+                                                          rusoto::Region::UsWest2);
+        let result = attach_specific_volume(&String::from("i-1234"),
+                                            &String::from("vol-4321"),
+                                            &mock_ec2_client);
+        assert!(result.is_err())
+    }
 }
