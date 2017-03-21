@@ -50,3 +50,18 @@
     - Wait 30 seconds (hopeful consensus timeout)
     - Ensure volume has tags {Token: ...uuid..., Timestamp: ...ts...} as expected; it is now ours
     - Only give up and create a volume after all volumes are in-use
+
+## AWS Development Environment
+
+Based off Ubuntu 16.04, t2.medium:
+
+```
+sudo apt-get update
+sudo apt-get install -y build-essential pkg-config libssl-dev
+curl https://sh.rustup.rs -sSf | sh -- -y
+source $HOME/.cargo/env
+git clone https://github.com/mfenniak/cloud-persistent-storage.git
+cd cloud-persistent-storage
+cargo build
+export RUST_LOG=cloud_persistent_storage
+```
