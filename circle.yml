@@ -13,11 +13,11 @@ dependencies:
     - if [ ! -f ~/.cargo/bin/rustup ]; then  curl https://sh.rustup.rs -sSf | sh -s -- -y; fi
     # Update to latest rust if necessary
     - ~/.cargo/bin/rustup update
-    # Fetch dependencies
-    - ~/.cargo/bin/cargo fetch
+    # This also builds the project itself... but the goal here is to build dependencies before they're cached.
+    - ~/.cargo/bin/cargo build
   cache_directories:
     - ~/.cargo
 
 test:
   override:
-    - ~/.cargo/bin/cargo test
+    - ~/.cargo/bin/cargo test --verbose
