@@ -13,14 +13,14 @@ impl From<std::io::Error> for MakeFilesystemError {
     }
 }
 
-pub fn make_filesystem() -> Result<(), MakeFilesystemError> {
+pub fn make_filesystem(block_device: &str) -> Result<(), MakeFilesystemError> {
     // FIXME: config: mkfs options
     let result = try!(Command::new("/sbin/mkfs")
                           .arg("-t")
                           .arg("ext4")
                           .arg("-m")
                           .arg("0")
-                          .arg("/dev/xvdh")
+                          .arg(block_device)
                           .stdin(Stdio::null())
                           .output());
     if result.status.success() {

@@ -17,7 +17,9 @@ fn main() {
     // FIXME: windows platform support for mkfs/mount
     // FIXME: allocate volume if find_and_attach fails due to NoVolumesAvailable/AllAttachesFailed
 
-    match ebs::find_and_attach_volume() {
+    let block_device = "/dev/xvdh";
+
+    match ebs::find_and_attach_volume(block_device) {
         Ok(_) => info!("attach volume succeeded"),
         Err(e) => {
             error!("attach volume failed: {:?}", e);
@@ -26,8 +28,9 @@ fn main() {
     }
     // FIXME: poll describe-volumes until .Volumes[0].Attachments[0].State == "attached"
 
+
     // FIXME: detect whether device has a filesystem on it
-    match mkfs::make_filesystem() {
+    match mkfs::make_filesystem(block_device) {
         Ok(_) => info!("created filesystem successfully"),
         Err(e) => {
             error!("failed to create filesystem: {:?}", e);
@@ -35,13 +38,20 @@ fn main() {
         }
     }
 
-    // FIXME: rust equivalent to mkdir -p on the mount target
+    let mount_point = "/mnt/test";
+    match std::fs::create_dir_all(mount_point) {
+        Ok(_) => info!("created/ensured mount point directory successfully"),
+        Err(e) => {
+            error!("failed to create mount point directory: {:?}", e);
+            std::process::exit(103);
+        }
+    }
 
-    match mount::mount() {
+    match mount::mount(block_device, mount_point) {
         Ok(_) => info!("mounted filesystem successfully"),
         Err(e) => {
             error!("failed to mount filesystem: {:?}", e);
-            std::process::exit(103);
+            std::process::exit(104);
         }
     }
 }

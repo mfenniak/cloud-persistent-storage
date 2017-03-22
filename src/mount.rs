@@ -13,11 +13,11 @@ impl From<std::io::Error> for MountError {
     }
 }
 
-pub fn mount() -> Result<(), MountError> {
+pub fn mount(block_device: &str, mount_point: &str) -> Result<(), MountError> {
     // FIXME: config: mount options
     let result = try!(Command::new("/bin/mount")
-                          .arg("/dev/xvdh")
-                          .arg("/mnt/test")
+                          .arg(block_device)
+                          .arg(mount_point)
                           .stdin(Stdio::null())
                           .output());
     if result.status.success() {
