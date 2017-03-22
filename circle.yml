@@ -1,7 +1,7 @@
 dependencies:
   override:
     # Install rust, if not already installed (eg. cached)
-    - if [ ! -f ~/.cargo/bin/rustup ]; then  curl https://sh.rustup.rs -sSf | sh /dev/stdin --yes; fi
+    - if [ ! -f ~/.cargo/bin/rustup ]; then  curl https://sh.rustup.rs -sSf | sh -s -- -y; fi
     # Update to latest rust if necessary
     - ~/.cargo/bin/rustup update
     # Fetch dependencies
