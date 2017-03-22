@@ -17,6 +17,7 @@ dependencies:
     - ~/.cargo/bin/cargo build
   cache_directories:
     - ~/.cargo
+    - ~/.rustup
 
 test:
   override:
