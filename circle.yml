@@ -12,7 +12,7 @@ dependencies:
     # Install rust, if not already installed (eg. cached)
     - if [ ! -f ~/.cargo/bin/rustup ]; then  curl https://sh.rustup.rs -sSf | sh -s -- -y; fi
     # Update to latest rust if necessary
-    - ~/.cargo/bin/rustup update
+    - ~/.cargo/bin/rustup install stable && ~/.cargo/bin/rustup update stable && ~/.cargo/bin/rustup default stable
     # This also builds the project itself... but the goal here is to build dependencies before they're cached.
     - ~/.cargo/bin/cargo build
   cache_directories:
