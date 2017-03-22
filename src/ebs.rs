@@ -72,7 +72,7 @@ fn attach_volume<P, D>(ec2_client: &Ec2Client<P, D>,
 
         for vol in &volumes {
             debug!("attempting to attach target volume: {:?}", vol);
-            let attach_volume_result = attach_specific_volume(&metadata.instance_id,
+            let attach_volume_result = attach_specific_volume(metadata.instance_id.as_str(),
                                                               vol.volume_id.as_ref().unwrap(),
                                                               &ec2_client);
             if attach_volume_result.is_ok() {
@@ -90,8 +90,8 @@ fn attach_volume<P, D>(ec2_client: &Ec2Client<P, D>,
     }
 }
 
-fn attach_specific_volume<P, D>(instance_id: &String,
-                                volume_id: &String,
+fn attach_specific_volume<P, D>(instance_id: &str,
+                                volume_id: &str,
                                 ec2_client: &Ec2Client<P, D>)
                                 -> Result<(), rusoto::ec2::AttachVolumeError>
     where P: ProvideAwsCredentials,
@@ -100,8 +100,8 @@ fn attach_specific_volume<P, D>(instance_id: &String,
     let request = AttachVolumeRequest {
         device: String::from("/dev/xvdh"), // FIXME
         dry_run: None, //
-        instance_id: instance_id.clone(),
-        volume_id: volume_id.clone(),
+        instance_id: String::from(instance_id),
+        volume_id: String::from(volume_id),
     };
     try!(ec2_client.attach_volume(&request));
     Ok(())
