@@ -1,0 +1,11 @@
+dependencies:
+  override:
+    - if [ ! -f ~/.cargo/bin/rustup ]; then  curl https://sh.rustup.rs -sSf | sh /dev/stdin --yes; fi
+    - ~/.cargo/bin/rustup update
+    - ~/.cargo/bin/cargo fetch
+  cache_directories:
+    - ~/.cargo
+
+test:
+  override:
+    - ~/.cargo/bin/cargo test
