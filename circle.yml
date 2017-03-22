@@ -7,18 +7,12 @@ checkout:
     # ref: https://discuss.circleci.com/t/cargo-build-fails-on-fresh-install/1102/5
     - git config --global --unset url.ssh://git@github.com:.insteadof
 
+# Made an early attempt to cache ~/.cargo, ~/.rustup, and 'target'... but 'cargo build' would still recompile all the
+# dependencies.  Since each of those dirs is 200MB and a 600MB pointless cache doesn't seem very nice to circle, and
+# starting from scratch seems fast enough, I've reverted to that approach.
 dependencies:
   override:
-    # Install rust, if not already installed (eg. cached)
-    - if [ ! -f ~/.cargo/bin/rustup ]; then  curl https://sh.rustup.rs -sSf | sh -s -- -y; fi
-    # Update to latest rust if necessary
-    - ~/.cargo/bin/rustup install stable && ~/.cargo/bin/rustup update stable && ~/.cargo/bin/rustup default stable
-    # This also builds the project itself... but the goal here is to build dependencies before they're cached.
-    - ~/.cargo/bin/cargo build
-  cache_directories:
-    - ~/.cargo
-    - ~/.rustup
-    - target
+    - curl https://sh.rustup.rs -sSf | sh -s -- -y
 
 test:
   override:
