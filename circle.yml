@@ -18,6 +18,7 @@ dependencies:
   cache_directories:
     - ~/.cargo
     - ~/.rustup
+    - target
 
 test:
   override:
