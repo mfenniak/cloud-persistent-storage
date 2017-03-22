@@ -9,6 +9,9 @@ log = "*"
 env_logger = "*"
 aws_instance_metadata = "0.1"
 chrono = "0.2"
+serde = "0.9"
+serde_derive = "0.9"
+serde_yaml = "0.6"
 
 [dev-dependencies]
 hyper = "0.10"

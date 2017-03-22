@@ -4,10 +4,14 @@ extern crate env_logger;
 extern crate rusoto;
 extern crate aws_instance_metadata;
 extern crate chrono;
+extern crate serde_yaml;
+#[macro_use]
+extern crate serde_derive;
 
 mod mkfs;
 mod ebs;
 mod mount;
+mod config;
 
 fn main() {
     env_logger::init().unwrap();
