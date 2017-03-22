@@ -1,3 +1,12 @@
+checkout:
+  post:
+    # circle installs a ~/.git/config that forces access to github to go through ssh, rather than https, so that
+    # circle's ssh deploy keys will work.  But this prevents access to github for cargo to download the cargo
+    # registry.  This command should revert that configuration.
+    # ref: https://github.com/rust-lang/cargo/issues/2078
+    # ref: https://discuss.circleci.com/t/cargo-build-fails-on-fresh-install/1102/5
+    - git config --global --unset url.ssh://git@github.com:.insteadof
+
 dependencies:
   override:
     # Install rust, if not already installed (eg. cached)
