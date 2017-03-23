@@ -7,14 +7,72 @@ extern crate chrono;
 extern crate serde_yaml;
 #[macro_use]
 extern crate serde_derive;
+extern crate getopts;
+
+use getopts::Options;
+use std::env;
+use std::fs::File;
+use std::io::Read;
 
 mod mkfs;
 mod ebs;
 mod mount;
 mod config;
 
+fn print_usage(program: &str, opts: Options) {
+    let brief = format!("Usage: {} [options]", program);
+    print!("{}", opts.usage(&brief));
+}
+
 fn main() {
     env_logger::init().unwrap();
+
+    let args: Vec<String> = env::args().collect();
+    let program = args[0].clone();
+
+    let mut opts = Options::new();
+    opts.optopt("c",
+                "config",
+                "configuration file path (required)",
+                "config.yml");
+    opts.optflag("h", "help", "print this help menu");
+    let matches = match opts.parse(&args[1..]) {
+        Ok(m) => m,
+        Err(f) => panic!(f.to_string()),
+    };
+    if matches.opt_present("h") {
+        print_usage(&program, opts);
+        return;
+    }
+
+    let config_path = match matches.opt_str("c") {
+        Some(c) => c,
+        None => {
+            error!("configuration file path (-c, --config) must be provided");
+            std::process::exit(100);
+
+        }
+    };
+    info!("config path: {}", config_path);
+
+    let config_file = File::open(config_path);
+    if let Err(e) = config_file {
+        error!("unable to open config file: {}", e);
+        std::process::exit(100);
+    }
+    let mut config_contents = String::new();
+    if let Err(e) = config_file.unwrap().read_to_string(&mut config_contents) {
+        error!("unable to read config file: {}", e);
+        std::process::exit(100);
+    }
+    let config = match config::parse_config(config_contents.as_str()) {
+        Ok(c) => c,
+        Err(e) => {
+            error!("failed to parse config file: {:?}", e);
+            std::process::exit(100);
+        }
+    };
+    info!("configuration: {:?}", config);
 
     // FIXME: config: mount point
     // FIXME: config: filesystem type

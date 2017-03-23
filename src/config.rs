@@ -65,6 +65,7 @@ fn default_mount_target() -> String {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)] // Just so I can match on things not here... for future additions of more error codes
 pub enum ConfigError {
     YamlParseError(serde_yaml::Error),
     ReservedForFuture,
