@@ -9,11 +9,17 @@ use std::fmt;
 #[serde(rename_all = "kebab-case")]
 #[serde(deny_unknown_fields)]
 pub struct Config {
+    #[serde(default = "default_block_device")]
+    pub block_device: String,
     pub block_provider: BlockProvider,
     #[serde(default = "default_file_system")]
     pub file_system: FileSystem,
     #[serde(default = "default_mount")]
     pub mount: Mount,
+}
+
+fn default_block_device() -> String {
+    String::from("/dev/xvdc")
 }
 
 #[derive(Debug, Deserialize)]
@@ -194,6 +200,7 @@ mod tests {
     #[test]
     fn validate_block_provider_aws_ebs_volume_type() {
         let config = Config {
+            block_device: default_block_device(),
             block_provider: BlockProvider::AwsEbs(EbsBlockProviderConfig {
                                                       ebs_tags: HashMap::new(),
                                                       size: 200,
@@ -212,6 +219,7 @@ mod tests {
     #[test]
     fn validate_block_provider_aws_ebs_size() {
         let config = Config {
+            block_device: default_block_device(),
             block_provider: BlockProvider::AwsEbs(EbsBlockProviderConfig {
                                                       ebs_tags: HashMap::new(),
                                                       size: -100,
@@ -229,6 +237,7 @@ mod tests {
     #[test]
     fn validate_block_provider_aws_ebs_tags() {
         let config = Config {
+            block_device: default_block_device(),
             block_provider: BlockProvider::AwsEbs(EbsBlockProviderConfig {
                                                       ebs_tags: HashMap::new(),
                                                       size: 200,
@@ -248,6 +257,7 @@ mod tests {
         let mut ebs_tags: HashMap<String, String> = HashMap::new();
         ebs_tags.insert(String::from("a"), String::from("b"));
         let config = Config {
+            block_device: default_block_device(),
             block_provider: BlockProvider::AwsEbs(EbsBlockProviderConfig {
                                                       ebs_tags: ebs_tags,
                                                       size: 200,
@@ -266,6 +276,7 @@ mod tests {
         let mut ebs_tags: HashMap<String, String> = HashMap::new();
         ebs_tags.insert(String::from("a"), String::from("b"));
         let config = Config {
+            block_device: default_block_device(),
             block_provider: BlockProvider::AwsEbs(EbsBlockProviderConfig {
                                                       ebs_tags: ebs_tags,
                                                       size: 200,
@@ -287,6 +298,8 @@ block-provider:
 "#;
 
     const EXAMPLE_FULL_EBS_CONFIG: &'static str = r#"
+block-device: /dev/xvdf
+
 block-provider:
   aws-ebs:
     ebs-tags:
@@ -308,6 +321,18 @@ mount:
             ConfigError::YamlParseError(_) => {}
             _ => assert!(false, "expected YamlParseError"),
         }
+    }
+
+    #[test]
+    fn parses_block_device() {
+        let config = parse_config(EXAMPLE_FULL_EBS_CONFIG).unwrap();
+        assert_eq!("/dev/xvdf", config.block_device);
+    }
+
+    #[test]
+    fn block_device_default() {
+        let config = parse_config(EXAMPLE_MINIMAL_EBS_CONFIG).unwrap();
+        assert_eq!("/dev/xvdc", config.block_device);
     }
 
     #[test]
@@ -336,6 +361,7 @@ mount:
 
     #[test]
     fn block_provider_aws_ebs_deny_unknown_fields() {
+        // FIXME: this test is pretty fragile; it could start failing because of missing fields
         let config_text = r#"
 block-provider:
   aws-ebs:

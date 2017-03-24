@@ -4,6 +4,7 @@ use aws_instance_metadata;
 use rusoto::{DefaultCredentialsProvider, ProvideAwsCredentials, DispatchSignedRequest};
 use rusoto::ec2::{Ec2Client, DescribeVolumesRequest, Filter, AttachVolumeRequest};
 use rusoto::default_tls_client;
+use config::EbsBlockProviderConfig;
 
 #[derive(Debug)]
 pub enum AttachVolumeError {
@@ -19,7 +20,9 @@ impl From<rusoto::ec2::DescribeVolumesError> for AttachVolumeError {
     }
 }
 
-pub fn find_and_attach_volume(block_device: &str) -> Result<(), AttachVolumeError> {
+pub fn find_and_attach_volume(block_device: &str,
+                              config: &EbsBlockProviderConfig)
+                              -> Result<(), AttachVolumeError> {
     let metadata = match aws_instance_metadata::get() {
         Ok(metadata) => metadata,
         Err(e) => {
@@ -91,6 +94,8 @@ fn attach_volume<P, D>(block_device: &str,
         Err(AttachVolumeError::NoVolumesAvailable)
     }
 }
+
+// Windows: block_device = xvdf - xvdp
 
 fn attach_specific_volume<P, D>(block_device: &str,
                                 instance_id: &str,

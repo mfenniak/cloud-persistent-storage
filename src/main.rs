@@ -69,13 +69,22 @@ fn main() {
 
     let block_device = "/dev/xvdh";
 
-    match ebs::find_and_attach_volume(block_device) {
-        Ok(_) => info!("attach volume succeeded"),
-        Err(e) => {
-            error!("attach volume failed: {:?}", e);
+    match config.block_provider {
+        config::BlockProvider::AwsEbs(ebs) => {
+            match ebs::find_and_attach_volume(config.block_device.as_str(), &ebs) {
+                Ok(_) => info!("attach volume succeeded"),
+                Err(e) => {
+                    error!("attach volume failed: {:?}", e);
+                    std::process::exit(101);
+                }
+            }
+        }
+        _ => {
+            error!("attach volume had unexpected block provider");
             std::process::exit(101);
         }
-    }
+    };
+
     // FIXME: poll describe-volumes until .Volumes[0].Attachments[0].State == "attached"
 
 

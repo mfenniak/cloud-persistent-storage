@@ -1,3 +1,5 @@
+block-device: /dev/xvdh
+
 block-provider:
   aws-ebs:
     ebs-tags:
