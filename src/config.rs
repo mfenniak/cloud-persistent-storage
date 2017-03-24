@@ -2,7 +2,6 @@ use serde_yaml;
 use std;
 use std::collections::HashMap;
 use std::fs::File;
-use std::error;
 use std::error::Error;
 use std::fmt;
 
@@ -74,18 +73,22 @@ pub enum ConfigError {
     YamlParseError(serde_yaml::Error),
     IoError(std::io::Error),
     InvalidBlockProviderAwsEbs(String),
+    InvalidFileSystem(String),
+    InvalidMount(String),
 }
 
-impl error::Error for ConfigError {
+impl Error for ConfigError {
     fn description(&self) -> &str {
         match *self {
             ConfigError::YamlParseError(ref err) => err.description(),
             ConfigError::IoError(ref err) => err.description(),
-            ConfigError::InvalidBlockProviderAwsEbs(ref err) => "invalid configuration in block-provider aws-ebs",
+            ConfigError::InvalidBlockProviderAwsEbs(_) => "invalid configuration in block-provider aws-ebs",
+            ConfigError::InvalidFileSystem(_) => "invalid configuration in file-system",
+            ConfigError::InvalidMount(_) => "invalid configuration in mount",
         }
     }
 
-    fn cause(&self) -> Option<&error::Error> {
+    fn cause(&self) -> Option<&Error> {
         match *self {
             ConfigError::YamlParseError(ref err) => Some(err),
             ConfigError::IoError(ref err) => Some(err),
@@ -100,6 +103,8 @@ impl fmt::Display for ConfigError {
             ConfigError::YamlParseError(ref err) => err.fmt(f),
             ConfigError::IoError(ref err) => err.fmt(f),
             ConfigError::InvalidBlockProviderAwsEbs(ref msg) => write!(f, "{}", msg),
+            ConfigError::InvalidFileSystem(ref msg) => write!(f, "{}", msg),
+            ConfigError::InvalidMount(ref msg) => write!(f, "{}", msg),
         }
     }
 }
@@ -116,7 +121,7 @@ impl From<std::io::Error> for ConfigError {
     }
 }
 
-pub fn parse_config(config_str: &str) -> Result<Config, ConfigError> {
+fn parse_config(config_str: &str) -> Result<Config, ConfigError> {
     let config = serde_yaml::from_str(config_str)?;
     if let Some(err) = validate_config(&config) {
         Err(err)
@@ -151,25 +156,35 @@ fn validate_block_provider(block_provider: &BlockProvider) -> Option<ConfigError
 }
 
 fn validate_block_provider_aws_ebs_config(config: &EbsBlockProviderConfig) -> Option<ConfigError> {
-    match config.volume_type.as_str() {
+    validate_block_provider_aws_ebs_volume_type(&config.volume_type)
+    .or_else(|| if config.size < 0 { Some(ConfigError::InvalidBlockProviderAwsEbs(String::from("invalid volume size"))) } else { None })
+    .or_else(|| if config.ebs_tags.len() <= 0 { Some(ConfigError::InvalidBlockProviderAwsEbs(String::from("at least one ebs tag is required"))) } else { None })
+}
+
+fn validate_block_provider_aws_ebs_volume_type(volume_type: &str) -> Option<ConfigError> {
+    match volume_type {
         "gp2" | "io1" | "st1" | "sc1" => None,
         vt => {
             Some(ConfigError::InvalidBlockProviderAwsEbs(String::from("invalid volume type, expected gp2, io1, st1, sc1: ") +
                                                          vt))
         }
     }
-    // FIXME: validate at least one EBS tag
-    // FIXME: validate size > 0
 }
 
 fn validate_file_system(config: &FileSystem) -> Option<ConfigError> {
-    None
-    // FIXME: validate mkfs is not empty
+    if config.mkfs.is_empty() {
+        Some(ConfigError::InvalidFileSystem(String::from("required parameter mkfs")))
+    } else {
+        None
+    }
 }
 
 fn validate_mount(config: &Mount) -> Option<ConfigError> {
-    None
-    // FIXME: validate target is not empty
+    if config.target.is_empty() {
+        Some(ConfigError::InvalidMount(String::from("required parameter target")))
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
@@ -177,7 +192,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn validate_block_provider_aws_ebs_type() {
+    fn validate_block_provider_aws_ebs_volume_type() {
         let config = Config {
             block_provider: BlockProvider::AwsEbs(EbsBlockProviderConfig {
                                                       ebs_tags: HashMap::new(),
@@ -194,10 +209,80 @@ mod tests {
                    format!("{}", err));
     }
 
+    #[test]
+    fn validate_block_provider_aws_ebs_size() {
+        let config = Config {
+            block_provider: BlockProvider::AwsEbs(EbsBlockProviderConfig {
+                                                      ebs_tags: HashMap::new(),
+                                                      size: -100,
+                                                      volume_type: String::from("gp2"),
+                                                  }),
+            file_system: default_file_system(),
+            mount: default_mount(),
+        };
+        let err = validate_config(&config).expect("expected config error");
+        assert_eq!("invalid configuration in block-provider aws-ebs",
+                   err.description());
+        assert_eq!("invalid volume size", format!("{}", err));
+    }
+
+    #[test]
+    fn validate_block_provider_aws_ebs_tags() {
+        let config = Config {
+            block_provider: BlockProvider::AwsEbs(EbsBlockProviderConfig {
+                                                      ebs_tags: HashMap::new(),
+                                                      size: 200,
+                                                      volume_type: String::from("gp2"),
+                                                  }),
+            file_system: default_file_system(),
+            mount: default_mount(),
+        };
+        let err = validate_config(&config).expect("expected config error");
+        assert_eq!("invalid configuration in block-provider aws-ebs",
+                   err.description());
+        assert_eq!("at least one ebs tag is required", format!("{}", err));
+    }
+
+    #[test]
+    fn validate_file_system_mkfs() {
+        let mut ebs_tags: HashMap<String, String> = HashMap::new();
+        ebs_tags.insert(String::from("a"), String::from("b"));
+        let config = Config {
+            block_provider: BlockProvider::AwsEbs(EbsBlockProviderConfig {
+                                                      ebs_tags: ebs_tags,
+                                                      size: 200,
+                                                      volume_type: String::from("gp2"),
+                                                  }),
+            file_system: FileSystem { mkfs: String::from("") },
+            mount: default_mount(),
+        };
+        let err = validate_config(&config).expect("expected config error");
+        assert_eq!("invalid configuration in file-system", err.description());
+        assert_eq!("required parameter mkfs", format!("{}", err));
+    }
+
+    #[test]
+    fn validate_mount_target() {
+        let mut ebs_tags: HashMap<String, String> = HashMap::new();
+        ebs_tags.insert(String::from("a"), String::from("b"));
+        let config = Config {
+            block_provider: BlockProvider::AwsEbs(EbsBlockProviderConfig {
+                                                      ebs_tags: ebs_tags,
+                                                      size: 200,
+                                                      volume_type: String::from("gp2"),
+                                                  }),
+            file_system: default_file_system(),
+            mount: Mount { target: String::from("") },
+        };
+        let err = validate_config(&config).expect("expected config error");
+        assert_eq!("invalid configuration in mount", err.description());
+        assert_eq!("required parameter target", format!("{}", err));
+    }
+
     const EXAMPLE_MINIMAL_EBS_CONFIG: &'static str = r#"
 block-provider:
   aws-ebs:
-    ebs-tags: {}
+    ebs-tags: { a: "b" }
     size: 200
 "#;
 
