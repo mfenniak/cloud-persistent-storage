@@ -11,8 +11,6 @@ extern crate getopts;
 
 use getopts::Options;
 use std::env;
-use std::fs::File;
-use std::io::Read;
 
 mod mkfs;
 mod ebs;
@@ -55,20 +53,10 @@ fn main() {
     };
     info!("config path: {}", config_path);
 
-    let config_file = File::open(config_path);
-    if let Err(e) = config_file {
-        error!("unable to open config file: {}", e);
-        std::process::exit(100);
-    }
-    let mut config_contents = String::new();
-    if let Err(e) = config_file.unwrap().read_to_string(&mut config_contents) {
-        error!("unable to read config file: {}", e);
-        std::process::exit(100);
-    }
-    let config = match config::parse_config(config_contents.as_str()) {
+    let config = match config::read_config_from_file(config_path.as_str()) {
         Ok(c) => c,
         Err(e) => {
-            error!("failed to parse config file: {:?}", e);
+            error!("failed to read configuration: {:?}", e);
             std::process::exit(100);
         }
     };
