@@ -30,8 +30,8 @@ pub fn create_filters(config: &EbsBlockProviderConfig) -> Vec<Filter> {
                      })
     }
     filters.push(Filter {
-                     name: Some("attachment.status".to_owned()),
-                     values: Some(vec!["detached".to_owned()]),
+                     name: Some("status".to_owned()),
+                     values: Some(vec!["available".to_owned()]),
                  });
     filters
 }
