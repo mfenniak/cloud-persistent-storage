@@ -48,15 +48,15 @@ fn default_ebs_volume_type() -> String {
 #[serde(deny_unknown_fields)]
 pub struct FileSystem {
     #[serde(default = "default_file_system_mkfs")]
-    pub mkfs: String,
+    pub mkfs: Vec<String>,
 }
 
 fn default_file_system() -> FileSystem {
     FileSystem { mkfs: default_file_system_mkfs() }
 }
 
-fn default_file_system_mkfs() -> String {
-    String::from("-t ext4 -m 0")
+fn default_file_system_mkfs() -> Vec<String> {
+    vec![String::from("-t"), String::from("ext4"), String::from("-m"), String::from("0")]
 }
 
 #[derive(Debug, Deserialize)]
@@ -263,7 +263,7 @@ mod tests {
                                                       size: 200,
                                                       volume_type: String::from("gp2"),
                                                   }),
-            file_system: FileSystem { mkfs: String::from("") },
+            file_system: FileSystem { mkfs: Vec::new() },
             mount: default_mount(),
         };
         let err = validate_config(&config).expect("expected config error");
@@ -308,7 +308,11 @@ block-provider:
     size: 200
 
 file-system:
-  mkfs: -t ext4 -m 5
+  mkfs:
+    - -t
+    - ext4
+    - -m
+    - 5
 
 mount:
   target: /mnt/test
@@ -378,20 +382,32 @@ block-provider:
     #[test]
     fn parses_file_system() {
         let config = parse_config(EXAMPLE_FULL_EBS_CONFIG).unwrap();
-        assert_eq!("-t ext4 -m 5", config.file_system.mkfs);
+        assert_eq!(vec![String::from("-t"),
+                        String::from("ext4"),
+                        String::from("-m"),
+                        String::from("5")],
+                   config.file_system.mkfs);
     }
 
     #[test]
     fn file_system_default() {
         let config = parse_config(EXAMPLE_MINIMAL_EBS_CONFIG).unwrap();
-        assert_eq!("-t ext4 -m 0", config.file_system.mkfs);
+        assert_eq!(vec![String::from("-t"),
+                        String::from("ext4"),
+                        String::from("-m"),
+                        String::from("0")],
+                   config.file_system.mkfs);
     }
 
     #[test]
     fn file_system_default_mkfs() {
         let config_text = String::from(EXAMPLE_MINIMAL_EBS_CONFIG) + "\n\nfile-system: {}";
         let config = parse_config(config_text.as_str()).unwrap();
-        assert_eq!("-t ext4 -m 0", config.file_system.mkfs);
+        assert_eq!(vec![String::from("-t"),
+                        String::from("ext4"),
+                        String::from("-m"),
+                        String::from("0")],
+                   config.file_system.mkfs);
     }
 
     #[test]

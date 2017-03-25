@@ -62,12 +62,7 @@ fn main() {
     };
     info!("configuration: {:?}", config);
 
-    // FIXME: config: mount point
-    // FIXME: config: filesystem type
-    // FIXME: windows platform support for mkfs/mount
     // FIXME: allocate volume if find_and_attach fails due to NoVolumesAvailable/AllAttachesFailed
-
-    let block_device = "/dev/xvdh";
 
     match config.block_provider {
         config::BlockProvider::AwsEbs(ebs) => {
@@ -87,9 +82,8 @@ fn main() {
 
     // FIXME: poll describe-volumes until .Volumes[0].Attachments[0].State == "attached"
 
-
     // FIXME: detect whether device has a filesystem on it
-    match mkfs::make_filesystem(block_device) {
+    match mkfs::make_filesystem(&config.file_system, config.block_device.as_str()) {
         Ok(_) => info!("created filesystem successfully"),
         Err(e) => {
             error!("failed to create filesystem: {:?}", e);
@@ -97,8 +91,7 @@ fn main() {
         }
     }
 
-    let mount_point = "/mnt/test";
-    match std::fs::create_dir_all(mount_point) {
+    match std::fs::create_dir_all(config.mount.target.to_owned()) {
         Ok(_) => info!("created/ensured mount point directory successfully"),
         Err(e) => {
             error!("failed to create mount point directory: {:?}", e);
@@ -106,7 +99,7 @@ fn main() {
         }
     }
 
-    match mount::mount(block_device, mount_point) {
+    match mount::mount(&config.mount, config.block_device.as_str()) {
         Ok(_) => info!("mounted filesystem successfully"),
         Err(e) => {
             error!("failed to mount filesystem: {:?}", e);

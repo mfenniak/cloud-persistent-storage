@@ -1,5 +1,6 @@
 use std;
 use std::process::{Command, Stdio};
+use config::FileSystem;
 
 #[derive(Debug)]
 pub enum MakeFilesystemError {
@@ -13,17 +14,17 @@ impl From<std::io::Error> for MakeFilesystemError {
     }
 }
 
-pub fn make_filesystem(block_device: &str) -> Result<(), MakeFilesystemError> {
-    // FIXME: config: mkfs options
-    let result = try!(Command::new("/sbin/mkfs")
-                          .arg("-t")
-                          .arg("ext4")
-                          .arg("-m")
-                          .arg("0")
-                          .arg(block_device)
-                          .stdin(Stdio::null())
-                          .output());
+pub fn make_filesystem(config: &FileSystem, block_device: &str) -> Result<(), MakeFilesystemError> {
+    let mut cmd = Command::new("/sbin/mkfs");
+    for arg in &config.mkfs {
+        cmd.arg(arg);
+    }
+    cmd.arg(block_device);
+    trace!("invoking mkfs: {:?}", cmd);
+
+    let result = try!(cmd.stdin(Stdio::null()).output());
     if result.status.success() {
+        trace!("external mkfs command succeeded");
         Ok(())
     } else {
         let err_text =

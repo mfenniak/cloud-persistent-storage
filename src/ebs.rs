@@ -2,7 +2,8 @@ use rusoto;
 use std;
 use aws_instance_metadata;
 use rusoto::{DefaultCredentialsProvider, ProvideAwsCredentials, DispatchSignedRequest};
-use rusoto::ec2::{Ec2Client, DescribeVolumesRequest, Filter, AttachVolumeRequest};
+use rusoto::ec2::{Ec2Client, DescribeVolumesRequest, DescribeVolumesError, Filter,
+                  AttachVolumeRequest};
 use rusoto::default_tls_client;
 use config::EbsBlockProviderConfig;
 
@@ -10,7 +11,7 @@ use config::EbsBlockProviderConfig;
 pub enum AttachVolumeError {
     NoVolumesAvailable,
     AllAttachesFailed,
-    DescribeVolumesFailed(rusoto::ec2::DescribeVolumesError),
+    DescribeVolumesFailed(DescribeVolumesError),
     DescribeVolumesPaginationSupportRequired,
 }
 
@@ -18,6 +19,21 @@ impl From<rusoto::ec2::DescribeVolumesError> for AttachVolumeError {
     fn from(err: rusoto::ec2::DescribeVolumesError) -> AttachVolumeError {
         AttachVolumeError::DescribeVolumesFailed(err)
     }
+}
+
+pub fn create_filters(config: &EbsBlockProviderConfig) -> Vec<Filter> {
+    let mut filters = Vec::with_capacity(config.ebs_tags.len() + 1);
+    for (tag_name, tag_value) in &config.ebs_tags {
+        filters.push(Filter {
+                         name: Some(String::from("tag:") + tag_name),
+                         values: Some(vec![tag_value.to_owned()]),
+                     })
+    }
+    filters.push(Filter {
+                     name: Some("attachment.status".to_owned()),
+                     values: Some(vec!["detached".to_owned()]),
+                 });
+    filters
 }
 
 pub fn find_and_attach_volume(block_device: &str,
@@ -37,25 +53,9 @@ pub fn find_and_attach_volume(block_device: &str,
                                     credentials,
                                     metadata.region().unwrap());
 
-    attach_volume(block_device, &ec2_client, &metadata)
-}
-
-fn attach_volume<P, D>(block_device: &str,
-                       ec2_client: &Ec2Client<P, D>,
-                       metadata: &aws_instance_metadata::metadata::InstanceMetadata)
-                       -> Result<(), AttachVolumeError>
-    where P: ProvideAwsCredentials,
-          D: DispatchSignedRequest
-{
-    // FIXME: need command-line option to provide tag-name and tag-value
-    // FIXME: add filter for attachment.status (possible options: {attaching | attached | detaching | detached})
-    let filter = Some(vec![Filter {
-                               name: Some("tag:tag-a".to_owned()),
-                               values: Some(vec!["value-a".to_owned()]),
-                           }]);
     let request = DescribeVolumesRequest {
         dry_run: None,
-        filters: filter,
+        filters: Some(create_filters(config)),
         max_results: None,
         next_token: None,
         volume_ids: None,
@@ -95,8 +95,6 @@ fn attach_volume<P, D>(block_device: &str,
     }
 }
 
-// Windows: block_device = xvdf - xvdp
-
 fn attach_specific_volume<P, D>(block_device: &str,
                                 instance_id: &str,
                                 volume_id: &str,
@@ -107,14 +105,13 @@ fn attach_specific_volume<P, D>(block_device: &str,
 {
     let request = AttachVolumeRequest {
         device: String::from(block_device),
-        dry_run: None, //
+        dry_run: None,
         instance_id: String::from(instance_id),
         volume_id: String::from(volume_id),
     };
     try!(ec2_client.attach_volume(&request));
     Ok(())
 }
-
 
 #[cfg(test)]
 mod tests {

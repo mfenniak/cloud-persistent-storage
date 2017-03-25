@@ -1,5 +1,6 @@
 use std;
 use std::process::{Command, Stdio};
+use config::Mount;
 
 #[derive(Debug)]
 pub enum MountError {
@@ -13,14 +14,14 @@ impl From<std::io::Error> for MountError {
     }
 }
 
-pub fn mount(block_device: &str, mount_point: &str) -> Result<(), MountError> {
-    // FIXME: config: mount options
-    let result = try!(Command::new("/bin/mount")
-                          .arg(block_device)
-                          .arg(mount_point)
-                          .stdin(Stdio::null())
-                          .output());
+pub fn mount(config: &Mount, block_device: &str) -> Result<(), MountError> {
+    let mut cmd = Command::new("/bin/mount");
+    cmd.arg(block_device);
+    cmd.arg(config.target.to_owned());
+    trace!("invoking mount: {:?}", cmd);
+    let result = try!(cmd.stdin(Stdio::null()).output());
     if result.status.success() {
+        trace!("external mount command succeeded");
         Ok(())
     } else {
         let err_text =

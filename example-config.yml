@@ -8,7 +8,11 @@ block-provider:
     size: 200
 
 file-system:
-  mkfs: -t ext4 -m 0
+  mkfs:
+    - -t
+    - ext4
+    - -m
+    - 5
 
 mount:
   target: /mnt/test
