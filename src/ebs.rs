@@ -13,6 +13,7 @@ pub enum AttachVolumeError {
     AllAttachesFailed,
     DescribeVolumesFailed(DescribeVolumesError),
     DescribeVolumesPaginationSupportRequired,
+    TimeoutWaitingForVolumeToAttach,
 }
 
 impl From<rusoto::ec2::DescribeVolumesError> for AttachVolumeError {
@@ -81,8 +82,8 @@ pub fn find_and_attach_volume(block_device: &str,
                                                               vol.volume_id.as_ref().unwrap(),
                                                               &ec2_client);
             if attach_volume_result.is_ok() {
-                info!("successfully attached volume");
-                return Ok(());
+                info!("successfully issued attach request");
+                return ensure_volume_attached(&ec2_client, vol.volume_id.as_ref().unwrap());
             } else {
                 debug!("failed to attach volume: {:?}", attach_volume_result.err())
             }
@@ -111,6 +112,50 @@ fn attach_specific_volume<P, D>(block_device: &str,
     };
     try!(ec2_client.attach_volume(&request));
     Ok(())
+}
+
+fn ensure_volume_attached<P, D>(ec2_client: &Ec2Client<P, D>,
+                                volume_id: &str)
+                                -> Result<(), AttachVolumeError>
+    where P: ProvideAwsCredentials,
+          D: DispatchSignedRequest
+{
+    info!("waiting for volume to attach");
+    let request = DescribeVolumesRequest {
+        dry_run: None,
+        filters: None,
+        max_results: None,
+        next_token: None,
+        volume_ids: Some(vec![String::from(volume_id)]),
+    };
+
+    let start = std::time::Instant::now();
+    let timeout = std::time::Duration::from_secs(5 * 60);
+    let sleep = std::time::Duration::from_secs(5);
+    while std::time::Instant::now().duration_since(start) < timeout {
+        if check_volume_attached(&ec2_client, &request)? {
+            return Ok(());
+        }
+        std::thread::sleep(sleep);
+    }
+    Err(AttachVolumeError::TimeoutWaitingForVolumeToAttach)
+}
+
+fn check_volume_attached<P, D>(ec2_client: &Ec2Client<P, D>,
+                               request: &DescribeVolumesRequest)
+                               -> Result<bool, AttachVolumeError>
+    where P: ProvideAwsCredentials,
+          D: DispatchSignedRequest
+{
+    trace!("checking DescribeVolumes to see if volume is attached");
+    ec2_client.describe_volumes(&request)?
+        .volumes
+        .as_ref()
+        .and_then(|volume_list| volume_list.get(0))
+        .and_then(|volume| volume.attachments.as_ref())
+        .and_then(|attachments| attachments.get(0))
+        .and_then(|attachment| attachment.state.as_ref())
+        .map_or(Ok(false), |state| Ok(state == "attached"))
 }
 
 #[cfg(test)]
