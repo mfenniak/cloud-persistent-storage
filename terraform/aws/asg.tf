@@ -17,7 +17,7 @@ locale-gen en_CA.UTF-8
 update-locale
 pip install awscli
 sudo -H -u ubuntu sh -c "curl https://sh.rustup.rs -sSf | sh -s -- -y"
-sudo -H -u ubuntu sh -c "cd ~/ && git clone https://github.com/mfenniak/cloud-persistent-storage.git && cd cloud-persistent-storage && cargo build"
+sudo -H -u ubuntu sh -c "cd ~/ && git clone https://github.com/mfenniak/cloud-persistent-storage.git && cd cloud-persistent-storage && ~/.cargo/bin/cargo build"
 EOF
 
   lifecycle {
