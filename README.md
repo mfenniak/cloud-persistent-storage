@@ -1,5 +1,10 @@
 # Cloud Persistent Storage
 
+## Current Limitations
+
+- Only works with ext4 filesystems.
+
+
 ## Dream Feature List
 
 - Support multiple cloud providers

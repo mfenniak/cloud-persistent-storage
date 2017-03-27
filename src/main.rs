@@ -62,8 +62,6 @@ fn main() {
     };
     info!("configuration: {:?}", config);
 
-    // FIXME: allocate volume if find_and_attach fails due to NoVolumesAvailable/AllAttachesFailed
-
     match config.block_provider {
         config::BlockProvider::AwsEbs(ebs) => {
             match ebs::find_and_attach_volume(config.block_device.as_str(), &ebs) {
@@ -80,13 +78,23 @@ fn main() {
         }
     };
 
-    // FIXME: poll describe-volumes until .Volumes[0].Attachments[0].State == "attached"
-
-    // FIXME: detect whether device has a filesystem on it
-    match mkfs::make_filesystem(&config.file_system, config.block_device.as_str()) {
-        Ok(_) => info!("created filesystem successfully"),
+    match mkfs::filesystem_exists(config.block_device.as_str()) {
+        Ok(true) => {
+            info!("filesystem already exists on block device");
+        }
+        Ok(false) => {
+            info!("filesystem was not found; creating");
+            match mkfs::make_filesystem(&config.file_system, config.block_device.as_str()) {
+                Ok(_) => info!("created filesystem successfully"),
+                Err(e) => {
+                    error!("failed to create filesystem: {:?}", e);
+                    std::process::exit(102);
+                }
+            }
+        }
         Err(e) => {
-            error!("failed to create filesystem: {:?}", e);
+            error!("failed to detect whether filesystem already exists: {:?}",
+                   e);
             std::process::exit(102);
         }
     }
