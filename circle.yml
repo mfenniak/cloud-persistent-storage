@@ -1,3 +1,7 @@
+machine:
+  services:
+    - docker
+
 checkout:
   post:
     # circle installs a ~/.git/config that forces access to github to go through ssh, rather than https, so that
