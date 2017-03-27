@@ -17,3 +17,14 @@ dependencies:
 test:
   override:
     - ~/.cargo/bin/cargo test --verbose
+
+deployment:
+  release:
+    tag: /^prerelease-v[0-9]+(\.[0-9]+)*$/
+    owner: mfenniak
+    commands:
+      - ./build-release.sh cloud-persistent-storage $CIRCLE_TAG
+      - wget https://github.com/tcnksm/ghr/releases/download/v0.5.4/ghr_v0.5.4_linux_amd64.zip
+      - unzip ghr_v0.5.4_linux_amd64.zip
+      - chmod +x ./ghr
+      - ./ghr $CIRCLE_TAG cloud-persistent-storage-${CIRCLE_TAG}.zip
