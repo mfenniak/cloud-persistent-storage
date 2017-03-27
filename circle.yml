@@ -1,3 +1,7 @@
+machine:
+  services:
+    - docker
+
 checkout:
   post:
     # circle installs a ~/.git/config that forces access to github to go through ssh, rather than https, so that
@@ -20,11 +24,11 @@ test:
 
 deployment:
   release:
-    tag: /^prerelease-v[0-9]+(\.[0-9]+)*$/
+    tag: /^v[0-9]+(\.[0-9]+)*$/
     owner: mfenniak
     commands:
       - ./build-release.sh cloud-persistent-storage $CIRCLE_TAG
       - wget https://github.com/tcnksm/ghr/releases/download/v0.5.4/ghr_v0.5.4_linux_amd64.zip
       - unzip ghr_v0.5.4_linux_amd64.zip
       - chmod +x ./ghr
-      - ./ghr $CIRCLE_TAG cloud-persistent-storage-${CIRCLE_TAG}.zip
+      - ./ghr -u mfenniak $CIRCLE_TAG cloud-persistent-storage-${CIRCLE_TAG}.zip
