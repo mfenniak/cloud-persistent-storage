@@ -17,7 +17,7 @@ mod ebs;
 mod mount;
 mod config;
 
-fn print_usage(program: &str, opts: Options) {
+fn print_usage(program: &str, opts: &Options) {
     let brief = format!("Usage: {} [options]", program);
     print!("{}", opts.usage(&brief));
 }
@@ -39,7 +39,7 @@ fn main() {
         Err(f) => panic!(f.to_string()),
     };
     if matches.opt_present("h") {
-        print_usage(&program, opts);
+        print_usage(&program, &opts);
         return;
     }
 

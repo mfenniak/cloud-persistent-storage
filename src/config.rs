@@ -127,15 +127,6 @@ impl From<std::io::Error> for ConfigError {
     }
 }
 
-fn parse_config(config_str: &str) -> Result<Config, ConfigError> {
-    let config = serde_yaml::from_str(config_str)?;
-    if let Some(err) = validate_config(&config) {
-        Err(err)
-    } else {
-        Ok(config)
-    }
-}
-
 pub fn read_config_from_file(config_path: &str) -> Result<Config, ConfigError> {
     let config_file = File::open(config_path)?;
     let config = serde_yaml::from_reader(config_file)?;
@@ -153,18 +144,18 @@ pub fn validate_config(config: &Config) -> Option<ConfigError> {
 }
 
 fn validate_block_provider(block_provider: &BlockProvider) -> Option<ConfigError> {
-    match block_provider {
-        &BlockProvider::AwsEbs(ref ebs_block_provider_config) => {
-            validate_block_provider_aws_ebs_config(&ebs_block_provider_config)
+    match *block_provider {
+        BlockProvider::AwsEbs(ref ebs_block_provider_config) => {
+            validate_block_provider_aws_ebs_config(ebs_block_provider_config)
         }
-        &BlockProvider::ReservedForFuture => panic!("huh"),
+        BlockProvider::ReservedForFuture => panic!("huh"),
     }
 }
 
 fn validate_block_provider_aws_ebs_config(config: &EbsBlockProviderConfig) -> Option<ConfigError> {
     validate_block_provider_aws_ebs_volume_type(&config.volume_type)
     .or_else(|| if config.size < 0 { Some(ConfigError::InvalidBlockProviderAwsEbs(String::from("invalid volume size"))) } else { None })
-    .or_else(|| if config.ebs_tags.len() <= 0 { Some(ConfigError::InvalidBlockProviderAwsEbs(String::from("at least one ebs tag is required"))) } else { None })
+    .or_else(|| if config.ebs_tags.is_empty() { Some(ConfigError::InvalidBlockProviderAwsEbs(String::from("at least one ebs tag is required"))) } else { None })
 }
 
 fn validate_block_provider_aws_ebs_volume_type(volume_type: &str) -> Option<ConfigError> {
@@ -196,6 +187,15 @@ fn validate_mount(config: &Mount) -> Option<ConfigError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn parse_config(config_str: &str) -> Result<Config, ConfigError> {
+        let config = serde_yaml::from_str(config_str)?;
+        if let Some(err) = validate_config(&config) {
+            Err(err)
+        } else {
+            Ok(config)
+        }
+    }
 
     #[test]
     fn validate_block_provider_aws_ebs_volume_type() {

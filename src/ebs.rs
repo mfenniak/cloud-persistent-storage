@@ -108,7 +108,7 @@ fn create_and_attach_if_advisable<P, D>(ec2_client: &Ec2Client<P, D>,
         AttachVolumeError::NoVolumesAvailable |
         AttachVolumeError::AllAttachesFailed => {
             info!("no existing volume is available for attaching; creating a new volume");
-            let volume_id = create_volume(availability_zone, &ec2_client, config)?;
+            let volume_id = create_volume(availability_zone, ec2_client, config)?;
             info!("waiting for volume to become available");
             ensure_volume_available(ec2_client, volume_id.as_str())?;
             info!("attaching new volume");
@@ -117,7 +117,7 @@ fn create_and_attach_if_advisable<P, D>(ec2_client: &Ec2Client<P, D>,
                                          volume_id.as_str(),
                                          ec2_client) {
                 Ok(_) => {
-                    ensure_volume_attached(&ec2_client, volume_id.as_str())?;
+                    ensure_volume_attached(ec2_client, volume_id.as_str())?;
                     Ok(())
                 }
                 Err(e) => Err(AttachVolumeError::AttachingCreatedVolumeFailed(e)),
@@ -201,10 +201,10 @@ fn attach_to_existing_volume<P, D>(instance_id: &str,
             let attach_volume_result = attach_specific_volume(block_device,
                                                               instance_id,
                                                               vol.volume_id.as_ref().unwrap(),
-                                                              &ec2_client);
+                                                              ec2_client);
             if attach_volume_result.is_ok() {
                 info!("successfully issued attach request");
-                return ensure_volume_attached(&ec2_client, vol.volume_id.as_ref().unwrap());
+                return ensure_volume_attached(ec2_client, vol.volume_id.as_ref().unwrap());
             } else {
                 debug!("failed to attach volume: {:?}", attach_volume_result.err())
             }
@@ -254,7 +254,7 @@ fn ensure_volume_available<P, D>(ec2_client: &Ec2Client<P, D>,
     let timeout = std::time::Duration::from_secs(5 * 60);
     let sleep = std::time::Duration::from_secs(5);
     while std::time::Instant::now().duration_since(start) < timeout {
-        if check_volume_available(&ec2_client, &request)? {
+        if check_volume_available(ec2_client, &request)? {
             return Ok(());
         }
         std::thread::sleep(sleep);
@@ -269,7 +269,7 @@ fn check_volume_available<P, D>(ec2_client: &Ec2Client<P, D>,
           D: DispatchSignedRequest
 {
     trace!("checking DescribeVolumes to see if volume is attached");
-    ec2_client.describe_volumes(&request)?
+    ec2_client.describe_volumes(request)?
         .volumes
         .as_ref()
         .and_then(|volume_list| volume_list.get(0))
@@ -296,7 +296,7 @@ fn ensure_volume_attached<P, D>(ec2_client: &Ec2Client<P, D>,
     let timeout = std::time::Duration::from_secs(5 * 60);
     let sleep = std::time::Duration::from_secs(5);
     while std::time::Instant::now().duration_since(start) < timeout {
-        if check_volume_attached(&ec2_client, &request)? {
+        if check_volume_attached(ec2_client, &request)? {
             return Ok(());
         }
         std::thread::sleep(sleep);
@@ -311,7 +311,7 @@ fn check_volume_attached<P, D>(ec2_client: &Ec2Client<P, D>,
           D: DispatchSignedRequest
 {
     trace!("checking DescribeVolumes to see if volume is attached");
-    ec2_client.describe_volumes(&request)?
+    ec2_client.describe_volumes(request)?
         .volumes
         .as_ref()
         .and_then(|volume_list| volume_list.get(0))

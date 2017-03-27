@@ -25,7 +25,7 @@ pub fn mount(config: &Mount, block_device: &str) -> Result<(), MountError> {
         Ok(())
     } else {
         let err_text =
-            String::from_utf8(result.stderr).unwrap_or(String::from("unable to decode mount stderr"));
+            String::from_utf8(result.stderr).unwrap_or_else(|_| String::from("unable to decode mount stderr"));
         Err(MountError::ExternalCommandFailed(err_text))
     }
 }

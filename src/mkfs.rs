@@ -28,7 +28,7 @@ pub fn make_filesystem(config: &FileSystem, block_device: &str) -> Result<(), Ma
         Ok(())
     } else {
         let err_text =
-            String::from_utf8(result.stderr).unwrap_or(String::from("unable to decode mkfs stderr"));
+            String::from_utf8(result.stderr).unwrap_or_else(|_| String::from("unable to decode mkfs stderr"));
         Err(MakeFilesystemError::ExternalCommandFailed(err_text))
     }
 }
