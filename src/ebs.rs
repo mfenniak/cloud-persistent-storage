@@ -3,7 +3,7 @@ use std;
 use aws_instance_metadata;
 use rusoto::{DefaultCredentialsProvider, ProvideAwsCredentials, DispatchSignedRequest};
 use rusoto::ec2::{Ec2Client, DescribeVolumesRequest, DescribeVolumesError, Filter,
-                  AttachVolumeRequest};
+                  AttachVolumeRequest, CreateVolumeRequest, CreateTagsRequest, Tag};
 use rusoto::default_tls_client;
 use config::EbsBlockProviderConfig;
 
@@ -14,11 +14,38 @@ pub enum AttachVolumeError {
     DescribeVolumesFailed(DescribeVolumesError),
     DescribeVolumesPaginationSupportRequired,
     TimeoutWaitingForVolumeToAttach,
+    CreatingVolumeFailed(CreateVolumeError),
+    AttachingCreatedVolumeFailed(rusoto::ec2::AttachVolumeError),
 }
 
 impl From<rusoto::ec2::DescribeVolumesError> for AttachVolumeError {
     fn from(err: rusoto::ec2::DescribeVolumesError) -> AttachVolumeError {
         AttachVolumeError::DescribeVolumesFailed(err)
+    }
+}
+
+impl From<CreateVolumeError> for AttachVolumeError {
+    fn from(err: CreateVolumeError) -> AttachVolumeError {
+        AttachVolumeError::CreatingVolumeFailed(err)
+    }
+}
+
+#[derive(Debug)]
+pub enum CreateVolumeError {
+    CreatingVolumeFailed(rusoto::ec2::CreateVolumeError),
+    TaggingVolumeFailed(rusoto::ec2::CreateTagsError),
+}
+
+impl From<rusoto::ec2::CreateVolumeError> for CreateVolumeError {
+    fn from(err: rusoto::ec2::CreateVolumeError) -> CreateVolumeError {
+        CreateVolumeError::CreatingVolumeFailed(err)
+    }
+}
+
+
+impl From<rusoto::ec2::CreateTagsError> for CreateVolumeError {
+    fn from(err: rusoto::ec2::CreateTagsError) -> CreateVolumeError {
+        CreateVolumeError::TaggingVolumeFailed(err)
     }
 }
 
@@ -54,6 +81,90 @@ pub fn find_and_attach_volume(block_device: &str,
                                     credentials,
                                     metadata.region().unwrap());
 
+    let instance_id = metadata.instance_id.as_str();
+    attach_to_existing_volume(instance_id, block_device, config, &ec2_client).or_else(|e| {
+        create_and_attach_if_advisable(&ec2_client, config, metadata.availability_zone.as_str(), block_device, instance_id, e)
+    })
+}
+
+fn create_and_attach_if_advisable<P, D>(ec2_client: &Ec2Client<P, D>,
+                                        config: &EbsBlockProviderConfig,
+                                        availability_zone: &str,
+                                        block_device: &str,
+                                        instance_id: &str,
+                                        e: AttachVolumeError)
+                                        -> Result<(), AttachVolumeError>
+    where P: ProvideAwsCredentials,
+          D: DispatchSignedRequest
+{
+    match e {
+        AttachVolumeError::NoVolumesAvailable |
+        AttachVolumeError::AllAttachesFailed => {
+            info!("no existing volume is available for attaching; creating a new volume");
+            let volume_id = create_volume(availability_zone, &ec2_client, config)?;
+            info!("attaching new volume");
+            match attach_specific_volume(block_device,
+                                         instance_id,
+                                         volume_id.as_str(),
+                                         ec2_client) {
+                Ok(_) => {
+                    ensure_volume_attached(&ec2_client, volume_id.as_str())?;
+                    Ok(())
+                }
+                Err(e) => Err(AttachVolumeError::AttachingCreatedVolumeFailed(e)),
+            }
+        }
+        _ => Err(e),
+    }
+}
+
+fn create_volume<P, D>(availability_zone: &str,
+                       ec2_client: &Ec2Client<P, D>,
+                       config: &EbsBlockProviderConfig)
+                       -> Result<String, CreateVolumeError>
+    where P: ProvideAwsCredentials,
+          D: DispatchSignedRequest
+{
+    let request = CreateVolumeRequest {
+        availability_zone: String::from(availability_zone),
+        dry_run: None,
+        encrypted: None,
+        iops: None,
+        kms_key_id: None,
+        size: Some(config.size),
+        snapshot_id: None,
+        volume_type: Some(config.volume_type.to_owned()),
+    };
+    let volume = ec2_client.create_volume(&request)?;
+    let volume_id = volume.volume_id.unwrap();
+
+    let mut tags = Vec::with_capacity(config.ebs_tags.len());
+    for (tag_name, tag_value) in &config.ebs_tags {
+        tags.push(Tag {
+                      key: Some(tag_name.to_owned()),
+                      value: Some(tag_value.to_owned()),
+                  });
+    }
+
+    let create_tags = CreateTagsRequest {
+        dry_run: None,
+        resources: vec![volume_id.to_owned()],
+        tags: tags,
+    };
+    ec2_client.create_tags(&create_tags)?;
+    // FIXME: should attempt to delete volume if create tags failed
+
+    Ok(volume_id)
+}
+
+fn attach_to_existing_volume<P, D>(instance_id: &str,
+                                   block_device: &str,
+                                   config: &EbsBlockProviderConfig,
+                                   ec2_client: &Ec2Client<P, D>)
+                                   -> Result<(), AttachVolumeError>
+    where P: ProvideAwsCredentials,
+          D: DispatchSignedRequest
+{
     let request = DescribeVolumesRequest {
         dry_run: None,
         filters: Some(create_filters(config)),
@@ -78,7 +189,7 @@ pub fn find_and_attach_volume(block_device: &str,
         for vol in &volumes {
             debug!("attempting to attach target volume: {:?}", vol);
             let attach_volume_result = attach_specific_volume(block_device,
-                                                              metadata.instance_id.as_str(),
+                                                              instance_id,
                                                               vol.volume_id.as_ref().unwrap(),
                                                               &ec2_client);
             if attach_volume_result.is_ok() {
