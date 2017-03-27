@@ -2,8 +2,7 @@
 
 ## Current Limitations
 
-- Only works with ext4 filesystems.
-
+- Only works with Linux ext2/3/4 filesystems.  When a block storage device is attached, it needs to detect whether the device already has a filesystem (eg. from a previous VM being attached), or whether the filesystem needs to be created (eg. volume was just created, or, previous VM created it but failed to create a filesystem).  This detection currently reads the ext filesystem magic bytes to detect whether the filesystem exists.  This could and should be enhanced to support other filesystems.  See the `filesystem_exists` function in [mkfs.fs](https://github.com/mfenniak/cloud-persistent-storage/blob/master/src/mkfs.rs).
 
 ## Dream Feature List
 
