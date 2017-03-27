@@ -34,6 +34,8 @@ impl From<CreateVolumeError> for AttachVolumeError {
 pub enum CreateVolumeError {
     CreatingVolumeFailed(rusoto::ec2::CreateVolumeError),
     TaggingVolumeFailed(rusoto::ec2::CreateTagsError),
+    DescribeVolumeFailed(DescribeVolumesError),
+    TimeoutWaitingForVolumeToBecomeAvailable,
 }
 
 impl From<rusoto::ec2::CreateVolumeError> for CreateVolumeError {
@@ -42,10 +44,15 @@ impl From<rusoto::ec2::CreateVolumeError> for CreateVolumeError {
     }
 }
 
-
 impl From<rusoto::ec2::CreateTagsError> for CreateVolumeError {
     fn from(err: rusoto::ec2::CreateTagsError) -> CreateVolumeError {
         CreateVolumeError::TaggingVolumeFailed(err)
+    }
+}
+
+impl From<rusoto::ec2::DescribeVolumesError> for CreateVolumeError {
+    fn from(err: rusoto::ec2::DescribeVolumesError) -> CreateVolumeError {
+        CreateVolumeError::DescribeVolumeFailed(err)
     }
 }
 
@@ -102,6 +109,8 @@ fn create_and_attach_if_advisable<P, D>(ec2_client: &Ec2Client<P, D>,
         AttachVolumeError::AllAttachesFailed => {
             info!("no existing volume is available for attaching; creating a new volume");
             let volume_id = create_volume(availability_zone, &ec2_client, config)?;
+            info!("waiting for volume to become available");
+            ensure_volume_available(ec2_client, volume_id.as_str())?;
             info!("attaching new volume");
             match attach_specific_volume(block_device,
                                          instance_id,
@@ -136,6 +145,7 @@ fn create_volume<P, D>(availability_zone: &str,
         volume_type: Some(config.volume_type.to_owned()),
     };
     let volume = ec2_client.create_volume(&request)?;
+    trace!("created volume: {:?}", volume);
     let volume_id = volume.volume_id.unwrap();
 
     let mut tags = Vec::with_capacity(config.ebs_tags.len());
@@ -223,6 +233,48 @@ fn attach_specific_volume<P, D>(block_device: &str,
     };
     try!(ec2_client.attach_volume(&request));
     Ok(())
+}
+
+fn ensure_volume_available<P, D>(ec2_client: &Ec2Client<P, D>,
+                                 volume_id: &str)
+                                 -> Result<(), CreateVolumeError>
+    where P: ProvideAwsCredentials,
+          D: DispatchSignedRequest
+{
+    info!("waiting for volume to attach");
+    let request = DescribeVolumesRequest {
+        dry_run: None,
+        filters: None,
+        max_results: None,
+        next_token: None,
+        volume_ids: Some(vec![String::from(volume_id)]),
+    };
+
+    let start = std::time::Instant::now();
+    let timeout = std::time::Duration::from_secs(5 * 60);
+    let sleep = std::time::Duration::from_secs(5);
+    while std::time::Instant::now().duration_since(start) < timeout {
+        if check_volume_available(&ec2_client, &request)? {
+            return Ok(());
+        }
+        std::thread::sleep(sleep);
+    }
+    Err(CreateVolumeError::TimeoutWaitingForVolumeToBecomeAvailable)
+}
+
+fn check_volume_available<P, D>(ec2_client: &Ec2Client<P, D>,
+                                request: &DescribeVolumesRequest)
+                                -> Result<bool, CreateVolumeError>
+    where P: ProvideAwsCredentials,
+          D: DispatchSignedRequest
+{
+    trace!("checking DescribeVolumes to see if volume is attached");
+    ec2_client.describe_volumes(&request)?
+        .volumes
+        .as_ref()
+        .and_then(|volume_list| volume_list.get(0))
+        .and_then(|volume| volume.state.as_ref())
+        .map_or(Ok(false), |state| Ok(state == "available"))
 }
 
 fn ensure_volume_attached<P, D>(ec2_client: &Ec2Client<P, D>,
