@@ -18,9 +18,10 @@ dependencies:
   override:
     - curl https://sh.rustup.rs -sSf | sh -s -- -y
 
-test:
-  override:
-    - ~/.cargo/bin/cargo test --verbose
+# Disabled just for speed of automated release testing.
+# test:
+#   override:
+#     - ~/.cargo/bin/cargo test --verbose
 
 deployment:
   release:
