@@ -28,7 +28,8 @@ deployment:
     owner: mfenniak
     commands:
       - ./build-release.sh cloud-persistent-storage $CIRCLE_TAG
+      - mv cloud-persistent-storage-${CIRCLE_TAG}.zip cloud-persistent-storage_${CIRCLE_TAG}_linux_amd64.zip
       - wget https://github.com/tcnksm/ghr/releases/download/v0.5.4/ghr_v0.5.4_linux_amd64.zip
       - unzip ghr_v0.5.4_linux_amd64.zip
       - chmod +x ./ghr
-      - ./ghr -u mfenniak $CIRCLE_TAG cloud-persistent-storage-${CIRCLE_TAG}.zip
+      - ./ghr -u mfenniak $CIRCLE_TAG cloud-persistent-storage_${CIRCLE_TAG}_linux_amd64.zip
