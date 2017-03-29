@@ -1,11 +1,11 @@
-resource "aws_launch_configuration" "test" {
-  name_prefix          = "cloud-persistent-storage-test"
+resource "aws_launch_configuration" "example" {
+  name_prefix          = "cloud-persistent-storage-example-${var.environment}"
   instance_type        = "${var.instance_type}"
   image_id             = "${var.ami}"
   key_name             = "${var.key_name}"
-  iam_instance_profile = "${aws_iam_instance_profile.test.id}"
+  iam_instance_profile = "${aws_iam_instance_profile.example.id}"
 
-  security_groups = ["${aws_security_group.test.id}"]
+  security_groups = ["${aws_security_group.example.id}"]
 
   user_data = <<EOF
 #!/usr/bin/env bash
@@ -20,12 +20,12 @@ cat > /etc/cloud-persistent-storage.yml <<CONFIG
 block-provider:
   aws-ebs:
     ebs-tags:
-      environment: production
-      role: postgresql
+      Environment: ${var.environment}
+      Role: PostgreSQL
     type: gp2
     size: 200
 CONFIG
-RUST_LOG=cloud_persistent_storage ./cloud-persistent-storage -c /etc/cloud-persistent-storage.yml
+SSL_CERT_DIR=/etc/ssl/certs RUST_LOG=cloud_persistent_storage ./cloud-persistent-storage -c /etc/cloud-persistent-storage.yml
 EOF
 
   lifecycle {
@@ -33,9 +33,9 @@ EOF
   }
 }
 
-resource "aws_autoscaling_group" "test" {
-  name                 = "cloud-persistent-storage-test"
-  launch_configuration = "${aws_launch_configuration.test.name}"
+resource "aws_autoscaling_group" "example" {
+  name                 = "cloud-persistent-storage-example-${var.environment}"
+  launch_configuration = "${aws_launch_configuration.example.name}"
   max_size             = "5"
   min_size             = "0"
   desired_capacity     = "1"
@@ -43,7 +43,13 @@ resource "aws_autoscaling_group" "test" {
 
   tag {
     key                 = "Name"
-    value               = "cloud-persistent-storage-test"
+    value               = "cloud-persistent-storage-example-${var.environment}"
+    propagate_at_launch = true
+  }
+
+  tag {
+    key                 = "Environment"
+    value               = "${var.environment}"
     propagate_at_launch = true
   }
 

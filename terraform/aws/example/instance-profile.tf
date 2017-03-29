@@ -1,5 +1,5 @@
-resource "aws_iam_role" "test" {
-  name = "cloud-persistent-storage-test-instance-role"
+resource "aws_iam_role" "example" {
+  name = "cloud-persistent-storage-example-${var.environment}-instance-role"
 
   assume_role_policy = <<EOF
 {
@@ -18,14 +18,14 @@ resource "aws_iam_role" "test" {
 EOF
 }
 
-resource "aws_iam_instance_profile" "test" {
-  name  = "cloud-persistent-storage-test-instance-profile"
-  roles = ["${aws_iam_role.test.name}"]
+resource "aws_iam_instance_profile" "example" {
+  name  = "cloud-persistent-storage-example-${var.environment}-instance-profile"
+  roles = ["${aws_iam_role.example.name}"]
 }
 
-resource "aws_iam_role_policy" "test" {
-  name = "cloud-persistent-storage-test-instance-role-polcy"
-  role = "${aws_iam_role.test.id}"
+resource "aws_iam_role_policy" "example" {
+  name = "cloud-persistent-storage-example-${var.environment}-instance-role-polcy"
+  role = "${aws_iam_role.example.id}"
 
   policy = <<EOF
 {

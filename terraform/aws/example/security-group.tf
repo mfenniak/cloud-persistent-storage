@@ -1,5 +1,5 @@
-resource "aws_security_group" "test" {
-  name   = "cloud-persistent-storage-test"
+resource "aws_security_group" "example" {
+  name   = "cloud-persistent-storage-example-${var.environment}"
   vpc_id = "${aws_vpc.main.id}"
 
   egress {
@@ -21,5 +21,9 @@ resource "aws_security_group" "test" {
     to_port     = 22
     protocol    = "tcp"
     cidr_blocks = ["68.147.122.199/32"]
+  }
+
+  tags {
+    Name = "cloud-persistent-storage-example-${var.environment}"
   }
 }
