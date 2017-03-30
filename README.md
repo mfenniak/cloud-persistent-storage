@@ -67,8 +67,12 @@ mount:
 
 ```bash
 apt-get install unzip
-wget https://github.com/mfenniak/cloud-persistent-storage/releases/download/v1.0.0/cloud-persistent-storage_v1.0.0_linux_amd64.zip
-unzip cloud-persistent-storage_v1.0.0_linux_amd64.zip
+export VERS=1.0.0
+export PLAT=linux_amd64
+export SSL_CERT_DIR=/etc/ssl/certs
+export RUST_LOG=cloud_persistent_storage
+wget https://github.com/mfenniak/cloud-persistent-storage/releases/download/v${VERS}/cloud-persistent-storage_v${VERS}_${PLAT}.zip
+unzip cloud-persistent-storage_v${VERS}_${PLAT}.zip
 chmod +x ./cloud-persistent-storage
 cat > /etc/cloud-persistent-storage.yml <<CONFIG
 block-provider:
@@ -79,7 +83,7 @@ block-provider:
     type: gp2
     size: 200
 CONFIG
-SSL_CERT_DIR=/etc/ssl/certs RUST_LOG=cloud_persistent_storage ./cloud-persistent-storage -c /etc/cloud-persistent-storage.yml
+./cloud-persistent-storage -c /etc/cloud-persistent-storage.yml
 ```
 
 Note:
