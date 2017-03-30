@@ -61,6 +61,37 @@ mount:
   target: /mnt
 ```
 
+## Running at Boot-up
+
+[terraform/aws/example/asg.tf](terraform/aws/example/asg.tf) contains a complete example, but here's a snippet of how you would run cloud-persistent-storage at boot on your AWS EC2 instances.  The following snippet would be part of the EC2 user_data:
+
+```bash
+apt-get install unzip
+wget https://github.com/mfenniak/cloud-persistent-storage/releases/download/v1.0.0/cloud-persistent-storage_v1.0.0_linux_amd64.zip
+unzip cloud-persistent-storage_v1.0.0_linux_amd64.zip
+chmod +x ./cloud-persistent-storage
+cat > /etc/cloud-persistent-storage.yml <<CONFIG
+block-provider:
+  aws-ebs:
+    ebs-tags:
+      Environment: Production
+      Role: PostgreSQL
+    type: gp2
+    size: 200
+CONFIG
+SSL_CERT_DIR=/etc/ssl/certs RUST_LOG=cloud_persistent_storage ./cloud-persistent-storage -c /etc/cloud-persistent-storage.yml
+```
+
+Note:
+
+- It'd be more efficient, reliable, and secure to bake the cloud-persistent-storage binary into a custom AMI, rather than download it every time.  I'd definitely recommend using [Packer](https://www.packer.io/) to accomplish this.
+
+- This example of downloading the executable on startup really ought to include some checksum validation, so that the release isn't changed to something malicious or unexpected under your nose.
+
+- `RUST_LOG=cloud_persistent_storage` increases the logging output for the tool.
+
+- `SSL_CERT_DIR=/etc/ssl/certs` points OpenSSL at the valid certificate authorities in your system; it's likely to be slightly different on different OSes.  This has been tested on Ubuntu.
+
 ## Current Limitations
 
 - As mentioned above, AWS EBS volumes can only be mounted on servers in the same AZ.  This tool does not currently do anything to address this issue; if volumes are unmountable because they're in the wrong AZ, they'll be skipped, and other available volumes will be mounted instead (or new volumes will be created).
