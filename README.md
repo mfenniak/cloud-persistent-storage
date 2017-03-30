@@ -1,5 +1,7 @@
 # Cloud Persistent Storage
 
+[![CircleCI](https://circleci.com/gh/mfenniak/cloud-persistent-storage.svg?style=svg)](https://circleci.com/gh/mfenniak/cloud-persistent-storage)
+
 cloud-persistent-storage is a tool designed to attach persistent storage devices to cloud servers that are configured to auto-scale.
 
 Currently it supports attaching AWS EBS volumes to Linux AWS EC2 servers running in an autoscaling group.  In the future, I'd love to support more cloud platforms, more server platforms, and more provisioning strategies.
@@ -68,6 +70,18 @@ mount:
 - Only supports Linux.
 
 - Only works with Linux ext2/3/4 filesystems.  When a block storage device is attached, it needs to detect whether the device already has a filesystem (eg. from a previous VM being attached), or whether the filesystem needs to be created (eg. volume was just created, or, previous VM created it but failed to create a filesystem).  This detection currently reads the ext filesystem magic bytes to detect whether the filesystem exists.  This could and should be enhanced to support other filesystems.  See the `filesystem_exists` function in [mkfs.fs](src/mkfs.rs).
+
+## Development / Contributing
+
+cloud-persistent-storage is written in Rust, specifically Rust 1.16.0.  It should be pretty straight-forward to clone, build (`cargo build`), and run unit tests (`cargo test`).
+
+Integration testing with AWS is a little bit trickier.  The directory [terraform/aws/dev](terraform/aws/dev) contains a set of Terraform scripts that will spin up a testing environment on AWS.  This environment is not free, and you will be charged by AWS.  If you use this, please be very careful to use `terraform destroy` to terminate the environment when your work is complete, otherwise you will continue to accumulate charges indefinitely.
+
+Please open GitHub issues for bug reports, feature requests, or general discussion about the software, and, please open GitHub pull requests for proposed enhancements or fixes.
+
+## License
+
+cloud-persistent-storage is distributed under the terms of the [GNU General Public License version 3](LICENSE).
 
 ## Dream Feature List
 
