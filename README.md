@@ -108,7 +108,7 @@ Note:
 
 ## Development / Contributing
 
-cloud-persistent-storage is written in Rust, specifically Rust 1.16.0.  It should be pretty straight-forward to clone, build (`cargo build`), and run unit tests (`cargo test`).
+cloud-persistent-storage is written in Rust, specifically Rust 1.16.0.  It should be pretty straight-forward to clone, build (`cargo build`), and run unit tests (`cargo test`).  It is formatted using `rustfmt`, and I'd appreciate if any contributions maintain that formatting style.
 
 Integration testing with AWS is a little bit trickier.  The directory [terraform/aws/dev](terraform/aws/dev) contains a set of Terraform scripts that will spin up a testing environment on AWS.  This environment is not free, and you will be charged by AWS.  If you use this, please be very careful to use `terraform destroy` to terminate the environment when your work is complete, otherwise you will continue to accumulate charges indefinitely.
 
