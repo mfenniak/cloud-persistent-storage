@@ -114,6 +114,12 @@ Integration testing with AWS is a little bit trickier.  The directory [terraform
 
 Please open GitHub issues for bug reports, feature requests, or general discussion about the software, and, please open GitHub pull requests for proposed enhancements or fixes.
 
+## FAQ
+
+Nobody has asked me any questions yet. :-(
+
+If you'd like to, you can reach me on (Twitter)[https://twitter.com/mfenniak], or, open an issue here on GitHub.
+
 ## License
 
 cloud-persistent-storage is distributed under the terms of the [GNU General Public License version 3](LICENSE).
