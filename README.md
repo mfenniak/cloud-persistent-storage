@@ -1,6 +1,6 @@
 # Cloud Persistent Storage
 
-cloud-persistent-storage is a tool desired to attach persistent storage devices to cloud servers that are configured to auto-scale.
+cloud-persistent-storage is a tool designed to attach persistent storage devices to cloud servers that are configured to auto-scale.
 
 Currently it supports attaching AWS EBS volumes to Linux AWS EC2 servers running in an autoscaling group.  In the future, I'd love to support more cloud platforms, more server platforms, and more provisioning strategies.
 
@@ -17,7 +17,7 @@ Pretty simple!
 
 The biggest caveat is that EBS volumes can only be mounted to servers in the same availability zone that they were originally created in.  So, if you're using this tool in an autoscaling group that launches servers across multiple availability zones, it's possible to "orphan" volumes in the other AZ and not attach them when they're available.  Correcting this is planned in a future enhancement.
 
-For a complete working example, check out the `terraform/aws/example` sub-directory and its documentation.
+For a complete working example, check out the [`terraform/aws/example`](terraform/aws/example) sub-directory and its documentation.
 
 ## Configuration
 
@@ -67,7 +67,7 @@ mount:
 
 - Only supports Linux.
 
-- Only works with Linux ext2/3/4 filesystems.  When a block storage device is attached, it needs to detect whether the device already has a filesystem (eg. from a previous VM being attached), or whether the filesystem needs to be created (eg. volume was just created, or, previous VM created it but failed to create a filesystem).  This detection currently reads the ext filesystem magic bytes to detect whether the filesystem exists.  This could and should be enhanced to support other filesystems.  See the `filesystem_exists` function in [mkfs.fs](https://github.com/mfenniak/cloud-persistent-storage/blob/master/src/mkfs.rs).
+- Only works with Linux ext2/3/4 filesystems.  When a block storage device is attached, it needs to detect whether the device already has a filesystem (eg. from a previous VM being attached), or whether the filesystem needs to be created (eg. volume was just created, or, previous VM created it but failed to create a filesystem).  This detection currently reads the ext filesystem magic bytes to detect whether the filesystem exists.  This could and should be enhanced to support other filesystems.  See the `filesystem_exists` function in [mkfs.fs](src/mkfs.rs).
 
 ## Dream Feature List
 
