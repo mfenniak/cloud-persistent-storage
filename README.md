@@ -125,7 +125,7 @@ Please open GitHub issues for bug reports, feature requests, or general discussi
 
 Nobody has asked me any questions yet. :-(
 
-If you'd like to, you can reach me on (Twitter)[https://twitter.com/mfenniak], or, open an issue here on GitHub.
+If you'd like to, you can reach me on [Twitter](https://twitter.com/mfenniak), or, open an issue here on GitHub.
 
 ## License
 
