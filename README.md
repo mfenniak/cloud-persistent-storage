@@ -2,22 +2,18 @@
 
 [![CircleCI](https://circleci.com/gh/mfenniak/cloud-persistent-storage.svg?style=svg)](https://circleci.com/gh/mfenniak/cloud-persistent-storage)
 
-cloud-persistent-storage is a tool designed to attach persistent storage devices to cloud servers that are configured to auto-scale.
-
-Currently it supports attaching AWS EBS volumes to Linux AWS EC2 servers running in an autoscaling group.  In the future, I'd love to support more cloud platforms, more server platforms, and more provisioning strategies.
+cloud-persistent-storage attaches persistent storage to auto-scaling cloud servers.
 
 Here's how it works:
 
-- When your server starts up, you run the cloud-persistent-storage with a simple YAML configuration file.
-- cloud-persistent-storage searches for existing AWS EBS volumes that match its configuration, and are available to be attached to this EC2 instance.
+- When your server starts up, it automatically runs cloud-persistent-storage with a simple YAML configuration file.
+- cloud-persistent-storage searches for existing AWS EBS volumes that match configured tags, and are available to be attached to this EC2 instance.
     - If a volume is found, it is attached.
-    - If no volume is found, it creates one based upon its configuration.
-- After the volume is attached, it detects whether a filesystem exists on the volume.  If none is found, one is initialized.
-- The filesystem is mounted at a configured mount point.
+    - If no volume is found, it creates a new volume and attaches it.
+- After the volume is attached, it ensures that a filesystem exists on the volume.
+- The volume is then mounted at a configured mount point.
 
-Pretty simple!
-
-The biggest caveat is that EBS volumes can only be mounted to servers in the same availability zone that they were originally created in.  So, if you're using this tool in an autoscaling group that launches servers across multiple availability zones, it's possible to "orphan" volumes in the other AZ and not attach them when they're available.  Correcting this is planned in a future enhancement.
+If your server is re-provisioned for any reason (eg. scheduled maintenance on the underlying hardware, terminated for a software or configuration upgrade, or just flat out terminated by a mistake), the same process will be repeated on a new replacement server, giving a new server instant access to the existing persisted data.
 
 For a complete working example, check out the [`terraform/aws/example`](terraform/aws/example) sub-directory and its documentation.
 
@@ -98,13 +94,24 @@ Note:
 
 ## Current Limitations
 
-- As mentioned above, AWS EBS volumes can only be mounted on servers in the same AZ.  This tool does not currently do anything to address this issue; if volumes are unmountable because they're in the wrong AZ, they'll be skipped, and other available volumes will be mounted instead (or new volumes will be created).
+- AWS EBS volumes can only be mounted on servers in the same AZ.  This tool does not currently do anything to address this issue; if volumes are unmountable because they're in the wrong AZ, they'll be skipped, and other available volumes will be mounted instead (or new volumes will be created).  I'd like to support some block storage relocation strategies in the future to address this limitation.
 
 - Only supports AWS + EC2 + EBS.  I'd like to support other cloud providers.
 
-- Only supports Linux.
+- Only supports Linux.  Windows support would be fantastic, but the APIs for detecting, configuring, and attaching block storage devices are much more complex than Linux.
 
 - Only works with Linux ext2/3/4 filesystems.  When a block storage device is attached, it needs to detect whether the device already has a filesystem (eg. from a previous VM being attached), or whether the filesystem needs to be created (eg. volume was just created, or, previous VM created it but failed to create a filesystem).  This detection currently reads the ext filesystem magic bytes to detect whether the filesystem exists.  This could and should be enhanced to support other filesystems.  See the `filesystem_exists` function in [mkfs.fs](src/mkfs.rs).
+
+## AWS Permissions
+
+As this tool makes AWS API calls to perform its actions, it requires certain actions to be available to it.  Generally these should be configured as part of a server's instance profile, so that credentials are available automatically to the service.  An example configuration is in [`terraform/aws/example/instance-profile.tf`](terraform/aws/example/instance-profile.tf).
+
+Required actions are:
+
+- `ec2:CreateVolume`
+- `ec2:CreateTags`
+- `ec2:AttachVolume`
+- `ec2:DescribeVolumes`
 
 ## Development / Contributing
 
@@ -134,14 +141,14 @@ cloud-persistent-storage is distributed under the terms of the [GNU General Publ
     - ~~Disk size~~
     - ~~Volume type (eg. EBS -> gp2, io1, st1, sc1)~~
     - ~~Filesystem creation options~~
-    - Create from snapshot, rather than creating empty volume
+    - Create from existing snapshot, rather than creating empty volume
 - Options for mounting persistent volume:
     - ~~Location~~
-    - Mount options
+    - Mount options, like ro, noatime
 - Support for different attachment strategies
-    - Attach any storage available in this AZ, or create one if none is available.
-    - Attach any storage available for this autoscaling group, or, create one if none is available.
-    - Auto-incrementing strategy; each machine in an autoscaling group is given a number, starting at 1, and incrementing for every *running* machine in the ASG.  If this machine is identified as "1", the volume for "1" is attached.  (If the volume for "1" is not in the correct availability zone, it is {snapshotted and copied to this AZ, or, the identification for "1" is revoked}).
+    - ~~Attach any storage available in this AZ, or create one if none is available.~~
+    - Safe attach to an EBS volume from a different AZ by snapshotting it, deleting it, and then recreating it in a new target AZ.  This would require some tricky coordination to avoid multiple new servers performing the same action.
+    - Auto-incrementing strategy; each machine in an autoscaling group is given a number, starting at 1, and incrementing for every *running* machine in the ASG.  If this machine is identified as "1", the volume for "1" is attached.  (If the volume for "1" is not in the correct availability zone, it is {snapshotted and copied to this AZ, or, the identification for "1" is revoked}).  This would be handy for systems like Zookeeper or Kafka, where a "broker id"-style identifier is needed.
 - Some attachment strategies might require an external cluster coordinator; support for:
     - Consul
     - Zookeeper
@@ -159,6 +166,7 @@ cloud-persistent-storage is distributed under the terms of the [GNU General Publ
 - Logging
 - Support for resizing volumes if configuration changes
     - eg. with AWS EBS, volume resize, filesystem resize to match, then mount
+- Integration with AWS ECS, such that individual containers could have persistent storage volumes, would be pretty neato
 
 ### AWS Cross-AZ Sharing Without External Coordinator
 
